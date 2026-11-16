@@ -1,0 +1,3 @@
+5dce501877fcada774ad63b8671ba73b  sft_data/sft_mix.jsonl
+03fbcce7752b503e03b1049941c719fe  sft_data/sft_reading.jsonl
+b76102ec5c17c0902bd97c2013eecfea  sft_data/sft_tool.jsonl
