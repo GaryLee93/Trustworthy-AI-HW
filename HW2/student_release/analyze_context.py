@@ -88,7 +88,7 @@ def analyze(preds, no_memory, val):
         "grounding": {
             "Correct with evidence in context*": correct_ev,
             "Correct without evidence in context (guesses)*": correct_no_ev,
-            "Predictions of another person's value": picks_other,
+            "Predictions copying another person's value from the context": picks_other,
             "Gold boost*": sum(boosts) / len(boosts) if boosts else None,
         },
         "counts": dict(non_tool=n, evidence_questions=ev_n, abstain=abstain_n),
