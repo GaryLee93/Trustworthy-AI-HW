@@ -41,10 +41,10 @@ Then, it looks up the relevant numbers the user mentioned, computes the answer i
 On Table~\ref{tab:diff}, tool-type accuracy rose from 0.30 to 0.98, so Mem Acc rose by 0.114 and LB by 0.080.
 \subsection{Update 2 - Avoid Saving Small Talk and Interrogative Sentences}
 \subsubsection{Motivation}
-We observed that 61-83\% of the lines retrieved by \texttt{prepare()} were small talk, and the same sentence was often repeated several times. 
+We observed that most of the lines retrieved by \texttt{prepare()} were small talk, and the same sentence was often repeated several times.
 The interrogative words in the question may match unrelated sentences.
 For example, 我叫什麼名字? retrieved 你覺得周末做什麼好? only because both contain 什麼.
-Besides, small talk repeats: on average 68 of the 128 utterances of a persona are duplicates.
+Besides, small talk repeats: many utterances of a persona are duplicates of earlier ones.
 \subsubsection{Solution}
 \texttt{chat()} was modified to skip utterances that are entirely questions to the agent and to keep only the latest copy of a repeated sentence.
 In \texttt{prepare()}, interrogative and function words (e.g., 什麼, 哪, 嗎) are removed from the question before matching.
@@ -131,9 +131,9 @@ The input is wrapped as in \texttt{next\_action()}, and the loss is computed onl
 \subsection{Result}
 Table~\ref{tab:e2mem} and Table~\ref{tab:e2tool} compare E2 with E1 - Update 4.
 All tool-call metrics reached 1.00, and Tool E2E rose from 0.055 to 1.00, so LB rose by 0.162 although Mem Acc fell from 0.457 to 0.284.
-The memory accuracy dropped in five of the six types: 75 questions became wrong and only 19 became correct.
+The memory accuracy dropped in five of the six types, and far more questions became wrong than became correct.
 On Table~\ref{tab:grounding}, the correct answers with evidence in the context dropped from 67 to 52, although the contexts are the same as Update 4.
-The tool-type accuracy fell from 0.98 to 0.47, option C was predicted 100 times instead of 60, and 你沒有提過 was chosen 30 times instead of 63.
+The tool-type accuracy fell from 0.98 to 0.47; we also observed that the model predicted option C much more often and chose 你沒有提過 much less often than in Update 4.
 The worst types are multi (0.06) and abstain (0.19); the causes are analyzed in Section~\ref{sec:e3motivation}.
 \begin{table}[H]
     \centering
@@ -198,7 +198,7 @@ Compared with Update 4, all six types improved, so Mem Acc rose by 0.521 and LB 
 Compared with E2, the tool-call metrics stayed almost the same, so the reading data restored and improved the memory accuracy without hurting tool calls.
 The worst types are update (0.93) and multi (0.94): most remaining errors have both the old and the new value in the context, and the model chose the old one (e.g., 業務 instead of 國小老師).
 The only tool-call error is a decision error: a sentence about another person was saved by \texttt{memory\_save}.
-These scores probably overestimate the test performance, since 49 of the 300 validation prompts also appear in \texttt{sft\_reading.jsonl} (see \texttt{data\_manifest.md}), while the test set uses unseen phrasings.
+These scores probably overestimate the test performance, since the training and validation sets are generated from the same public templates and some validation prompts also appear in \texttt{sft\_reading.jsonl}, while the test set uses unseen phrasings.
 \begin{table}[H]
     \centering
     \small
