@@ -7,6 +7,10 @@
 \usepackage{booktabs}
 \usepackage{float}
 \usepackage{graphicx}
+% 縮小表格上下與 caption 的間距，讓報告維持在 4 頁內
+\setlength{\intextsep}{6pt plus 2pt minus 2pt}
+\setlength{\abovecaptionskip}{4pt}
+\usepackage[compact]{titlesec}
 \begin{document}
 \begin{center}
     \Large Trustworthy AI HW 2\\
@@ -66,7 +70,7 @@ Accuracy did not improve although more evidence was retrieved, which may suggest
 On Table~\ref{tab:context}, evidence recall rose from 0.46 to 1.00.
 On Table~\ref{tab:grounding}, although the number of correct answers stayed at 60, all of them are now supported by evidence, whereas 28 of them were guesses after Update 2.
 Moreover, the context pushed the model toward the correct option more strongly (gold boost from 0.18 to 0.24).
-\subsection{Update 4 - Avoiding Saving Similar Fact about Other People in Context}
+\subsection{Update 4 - Differenting Similar Fact about Other People in Context}
 \subsubsection{Motivation}
 The distractor type questions use statements about other people (e.g., 我朋友對蝦子過敏) as distractor.
 To improve accuracy of this type, we need to tag these statements in \texttt{chat()} and exclude them in \texttt{prepare()}.
@@ -79,6 +83,8 @@ On Table~\ref{tab:diff}, distractor rose by 0.08, update by 0.07, and abstain by
 Mem Acc was raised from 0.423 to 0.457 (+0.034).
 On Table~\ref{tab:context}, no context contains statements about other people anymore (from 53\% of questions to 0\%).
 On Table~\ref{tab:grounding}, predictions copying another person's value from the context dropped from 20 to 0, and the gold boost rose from 0.24 to 0.34.
+After Update 4, the worst types are multi (0.19) and update (0.34).
+Since all evidence is already in the context (Table~\ref{tab:context}), these errors come from reading rather than retrieval: the model often prefers an option it favors without the context, or 你沒有提過.
 \begin{table}[H]
     \centering
     \small
@@ -105,13 +111,30 @@ Therefore, we fine-tuned the model on tool-call data so that it learns both when
 \texttt{sft\_tool.jsonl} (3,000 samples) was converted from \texttt{data/train/tool.jsonl} by \texttt{build\_sft\_data.py}; no validation or LLM-generated data were used.
 The model was fine-tuned from minimind-3 for 1 epoch (batch size 16, learning rate $10^{-5}$, seed 824).
 Details are in \texttt{data\_manifest.md}.
+Table~\ref{tab:e2data} shows two examples: the first should call \texttt{memory\_save}, and the second is about another person, so no tool should be called.
+The input is wrapped as in \texttt{next\_action()}, and the loss is computed only on the target.
+\begin{table}[H]
+    \centering
+    \footnotesize
+    \begin{tabular}{p{5.2cm}p{11.8cm}}
+        \toprule
+        User utterances & Target \\
+        \midrule
+        今天心情不錯 / 肉圓是我的最愛 & \texttt{<tool\_call>\{"name": "memory\_save", "arguments": \{"key": "最喜歡的食物", "value": "肉圓"\}\}</tool\_call>} \\
+        我朋友的兒子11歲 & 嗯嗯，了解！ (no tool call) \\
+        \bottomrule
+    \end{tabular}
+    \caption{Examples of \texttt{sft\_tool.jsonl}.}
+    \label{tab:e2data}
+\end{table}
 
 \subsection{Result}
-Table~\ref{tab:e2mem} and Table~\ref{tab:e2tool} compare E2 with E1 - update 4.
+Table~\ref{tab:e2mem} and Table~\ref{tab:e2tool} compare E2 with E1 - Update 4.
 All tool-call metrics reached 1.00, and Tool E2E rose from 0.055 to 1.00, so LB rose by 0.162 although Mem Acc fell from 0.457 to 0.284.
 The memory accuracy dropped in five of the six types: 75 questions became wrong and only 19 became correct.
 On Table~\ref{tab:grounding}, the correct answers with evidence in the context dropped from 67 to 52, although the contexts are the same as Update 4.
 The tool-type accuracy fell from 0.98 to 0.47, option C was predicted 100 times instead of 60, and 你沒有提過 was chosen 30 times instead of 63.
+The worst types are multi (0.06) and abstain (0.19); the causes are analyzed in Section~\ref{sec:e3motivation}.
 \begin{table}[H]
     \centering
     \small
@@ -122,7 +145,7 @@ The tool-type accuracy fell from 0.98 to 0.47, option C was predicted 100 times 
         E2 vs.\ E1 - Update 4 & -0.08 & +0.02 & -0.13 & -0.23 & -0.10 & -0.52 & -0.173 & +0.162 \\
         \bottomrule
     \end{tabular}
-    \caption{Difference of memory accuracy between E2 and E1 on the validation set.}
+    \caption{Difference of memory accuracy between E2 and E1 - Update 4 on the validation set.}
     \label{tab:e2mem}
 \end{table}
 \begin{table}[H]
@@ -132,15 +155,16 @@ The tool-type accuracy fell from 0.98 to 0.47, option C was predicted 100 times 
         \toprule
         Experiment & Format & Decision & Tool & Arg & E2E \\
         \midrule
-        E2 vs.\ Baselines & +0.43 & +0.36 & +0.76 & +1.00 & +0.945 \\
+        E2 vs.\ E1 - Update 4 & +0.43 & +0.36 & +0.76 & +1.00 & +0.945 \\
         \bottomrule
     \end{tabular}
-    \caption{Difference of tool-call metrics between E2 and E1 on the validation set.}
+    \caption{Difference of tool-call metrics between E2 and E1 - Update 4 on the validation set.}
     \label{tab:e2tool}
 \end{table}
 
 \section{Experiment 3 - Experiment 1 + Tool \& Reading SFT}
 \subsection{Motivation}
+\label{sec:e3motivation}
 In Experiment 1, memory accuracy improved because we changed how the agent stores and retrieves the memory.
 This improvement was lost in Experiment 2.
 Since E2 used the same contexts as Update 4, the drop may come from how the model reads the context rather than from retrieval.
@@ -152,11 +176,29 @@ We will use a new dataset made from \texttt{data/train/tool.jsonl} and \texttt{d
 \subsection{Data Manifest}
 \texttt{sft\_mix.jsonl} (6,000 samples) concatenates \texttt{sft\_tool.jsonl} of Experiment 2 and \texttt{sft\_reading.jsonl}, which was converted from \texttt{data/train/memory.jsonl}.
 The training settings are the same as Experiment 2. Details are in \texttt{data\_manifest.md}.
+In \texttt{sft\_reading.jsonl} (Table~\ref{tab:e3data}), the context is the output of \texttt{prepare()} of Update 4, the input is wrapped with the evaluation template, and the target is the correct option; the second example teaches the model to copy the computed answer.
+\begin{table}[H]
+    \centering
+    \footnotesize
+    \begin{tabular}{p{7.6cm}p{7.6cm}l}
+        \toprule
+        Context & Question (options) & Target \\
+        \midrule
+        房東漲房租了，現在一個月15000元 / 我現在比較常打桌球，以前的運動不玩了 / 我家在基隆 & 我現在住在哪個城市？ (你沒有提過 / 桃園 / 台南 / 基隆) & 基隆 \\
+        計算結果：24歲 & 我兩個小孩的年紀加起來幾歲？ (你沒有提過 / 24歲 / 26歲 / 23歲) & 24歲 \\
+        \bottomrule
+    \end{tabular}
+    \caption{Examples of \texttt{sft\_reading.jsonl}.}
+    \label{tab:e3data}
+\end{table}
 
 \subsection{Result}
 Table~\ref{tab:e3mem} and Table~\ref{tab:e3tool} compare E3 with E1 - Update 4 and E2.
 Compared with Update 4, all six types improved, so Mem Acc rose by 0.521 and LB by 0.647.
-Compared with E2, the tool-call metrics stayed almost the same (one item about another person was wrongly saved), so the reading data restored and improved the memory accuracy without hurting tool calls.
+Compared with E2, the tool-call metrics stayed almost the same, so the reading data restored and improved the memory accuracy without hurting tool calls.
+The worst types are update (0.93) and multi (0.94): most remaining errors have both the old and the new value in the context, and the model chose the old one (e.g., 業務 instead of 國小老師).
+The only tool-call error is a decision error: a sentence about another person was saved by \texttt{memory\_save}.
+These scores probably overestimate the test performance, since 49 of the 300 validation prompts also appear in \texttt{sft\_reading.jsonl} (see \texttt{data\_manifest.md}), while the test set uses unseen phrasings.
 \begin{table}[H]
     \centering
     \small
@@ -178,7 +220,7 @@ Compared with E2, the tool-call metrics stayed almost the same (one item about a
         \toprule
         Experiment & Format & Decision & Tool & Arg & E2E \\
         \midrule
-        E3 vs.\ Baselines & +0.43 & +0.35 & +0.76 & +1.00 & +0.940 \\
+        E3 vs.\ E1 - Update 4 & +0.43 & +0.35 & +0.76 & +1.00 & +0.940 \\
         E3 vs.\ E2 & +0 & -0.005 & +0 & +0 & -0.005 \\
         \bottomrule
     \end{tabular}
@@ -191,6 +233,7 @@ The three baselines and E1 share \texttt{BaseAgent.next\_action}, and the tool-c
 Comparing E1 with \texttt{KeywordRetrievalAgent} shows the contribution of the memory framework without training: Mem Acc rose by 0.124.
 Comparing E3 with E1 shows the contribution of SFT: Mem Acc rose by 0.521 and Tool E2E by 0.940.
 Comparing E2 with E3 shows that the reading data is necessary: tool-call SFT alone improved the tool calls but reduced Mem Acc by 0.173.
+TMMLU+ is the macro accuracy on the HW1 held-out set (437 questions, zero-shot, without the chat template); it dropped by 1.9 points after E2 and 4.2 points after E3, possibly because all SFT data are about personal memory and tool calls rather than general knowledge.
 \begin{table}[H]
     \centering
     \small
@@ -219,11 +262,11 @@ Comparing E2 with E3 shows that the reading data is necessary: tool-call SFT alo
         Model & Format & Decision & Tool & Arg & E2E & TMMLU+ & GPU-h \\
         \midrule
         Baselines and E1 (identical) & .57 & .65 & .24 & .00 & .055 & .306 & 0 \\
-        E2: E1 + tool SFT    & 1.00 & 1.00 & 1.00 & 1.00 & 1.000 & .287 & 59 \\
-        E3: E1 + reading \& tool SFT & 1.00 & .995 & 1.00 & 1.00 & .995 & .264 & 69 \\
+        E2: E1 + tool SFT    & 1.00 & 1.00 & 1.00 & 1.00 & 1.000 & .287 & .016 \\
+        E3: E1 + reading \& tool SFT & 1.00 & .995 & 1.00 & 1.00 & .995 & .264 & .019 \\
         \bottomrule
     \end{tabular}
-    \caption{Tool-call benchmark on the validation set, TMMLU+ accuracy, and training cost on RTX 4090 24GB (sec).}
+    \caption{Tool-call benchmark on the validation set, TMMLU+ accuracy, and training cost on an RTX 4090 24GB (total 0.036 GPU hours).}
     \label{tab:abltool}
 \end{table}
 
@@ -278,6 +321,8 @@ Update 1 is identical to \texttt{KeywordRetrievalAgent} on non-tool questions, a
 \end{itemize}
 \subsection{AI Usage}
 \begin{itemize}
-    \item Oh My Pi: Responsible for generating code, and the code is reviewed by me.
+    \item Oh My Pi (an AI coding agent) generated most of the code (the rules in \texttt{my\_agent.py}, \texttt{build\_sft\_data.py}, \texttt{train\_sft.py}, \texttt{analyze\_context.py}, and the shell scripts) and the diagram in Figure~\ref{fig:memory}; I reviewed, ran, and revised them.
+    \item It also helped analyze the results (e.g., per-question comparisons and the metrics in Section~\ref{sec:grounding}) and drafted parts of this report and \texttt{data\_manifest.md}; every number was checked against the result files.
+    \item LLM-generated paraphrases of user sentences and questions were used only to check whether the rules in \texttt{my\_agent.py} generalize to unseen phrasings; they were not used for training or for any reported score.
 \end{itemize}
 \end{document}
